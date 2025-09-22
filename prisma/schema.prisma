@@ -1,0 +1,100 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+    output = "/home/ubuntu/notion_inspired_app/app/node_modules/.prisma/client"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+// NextAuth.js Models
+model Account {
+    id                String  @id @default(cuid())
+    userId            String
+    type              String
+    provider          String
+    providerAccountId String
+    refresh_token     String? @db.Text
+    access_token      String? @db.Text
+    expires_at        Int?
+    token_type        String?
+    scope             String?
+    id_token          String? @db.Text
+    session_state     String?
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([provider, providerAccountId])
+}
+
+model Session {
+    id           String   @id @default(cuid())
+    sessionToken String   @unique
+    userId       String
+    expires      DateTime
+    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+    identifier String
+    token      String   @unique
+    expires    DateTime
+
+    @@unique([identifier, token])
+}
+
+// Application Models
+model User {
+    id            String    @id @default(cuid())
+    name          String?
+    email         String    @unique
+    password      String
+    emailVerified DateTime?
+    image         String?
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    // NextAuth relations
+    accounts Account[]
+    sessions Session[]
+
+    // Application relations
+    createdDocuments    Document[] @relation("CreatedBy")
+    lastEditedDocuments Document[] @relation("LastEditedBy")
+    uploadedImages      Image[]    @relation("UploadedBy")
+}
+
+model Document {
+    id           String   @id @default(cuid())
+    title        String
+    content      String   @db.Text
+    isPublic     Boolean  @default(false)
+    createdAt    DateTime @default(now())
+    lastEditedAt DateTime @updatedAt
+    
+    createdById    String
+    lastEditedById String?
+    
+    createdBy    User  @relation("CreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+    lastEditedBy User? @relation("LastEditedBy", fields: [lastEditedById], references: [id])
+    
+    images Image[]
+}
+
+model Image {
+    id           String   @id @default(cuid())
+    filename     String
+    originalName String
+    mimeType     String
+    size         Int
+    cdnUrl       String?
+    uploadedAt   DateTime @default(now())
+    
+    documentId   String?
+    uploadedById String
+    
+    document   Document? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+    uploadedBy User      @relation("UploadedBy", fields: [uploadedById], references: [id], onDelete: Cascade)
+}
